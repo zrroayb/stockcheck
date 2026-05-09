@@ -11,13 +11,27 @@ const IV_LEN = 12
 const TAG_LEN = 16
 
 function loadKey(): Buffer {
-  const hex = process.env.ENCRYPTION_KEY
+  let hex = process.env.ENCRYPTION_KEY?.trim() ?? ''
+  // Strip one layer of wrapping quotes (.env parsers sometimes leave these)
+  if (
+    (hex.startsWith('"') && hex.endsWith('"')) ||
+    (hex.startsWith("'") && hex.endsWith("'"))
+  ) {
+    hex = hex.slice(1, -1)
+  }
   if (!hex) {
-    throw new Error('ENCRYPTION_KEY is not set. Generate one with: openssl rand -hex 32')
+    throw new Error(
+      'ENCRYPTION_KEY is not set. Generate a 32-byte hex key: openssl rand -hex 32  — then paste ONLY the 64-character output into .env (shell command substitution inside .env does not run)'
+    )
   }
   const key = Buffer.from(hex, 'hex')
   if (key.length !== 32) {
-    throw new Error(`ENCRYPTION_KEY must decode to 32 bytes, got ${key.length}`)
+    const literalCommand = hex.includes('openssl') || hex.includes('$(')
+    throw new Error(
+      literalCommand
+        ? 'ENCRYPTION_KEY looks like an un-expanded shell command. In .env you must paste the openssl output literally, not "$(openssl rand -hex 32)". Run: openssl rand -hex 32'
+        : `ENCRYPTION_KEY must be 64 hex characters (32 bytes), got decoded length ${key.length}. Generate: openssl rand -hex 32`
+    )
   }
   return key
 }

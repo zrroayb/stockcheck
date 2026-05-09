@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { requireCompany } from '@/lib/auth'
+import { internalApiError } from '@/lib/api-response'
 
 export const runtime = 'nodejs'
 
@@ -63,8 +64,7 @@ export async function GET(req: NextRequest) {
     })
   } catch (err) {
     if (err instanceof Response) return err
-    console.error('[GET /api/products]', err)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    return internalApiError('[GET /api/products]', err)
   }
 }
 
@@ -105,7 +105,6 @@ export async function POST(req: NextRequest) {
     if ((err as { code?: string })?.code === 'P2002') {
       return NextResponse.json({ error: 'A product with this SKU already exists' }, { status: 409 })
     }
-    console.error('[POST /api/products]', err)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    return internalApiError('[POST /api/products]', err)
   }
 }

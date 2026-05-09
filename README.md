@@ -23,19 +23,25 @@ npm install
 # 2. Bring up Postgres + Redis
 docker compose up -d
 
-# 3. Generate an encryption key and copy env template
+# 3. Env: copy template, then add a real encryption key
 cp .env.example .env
-echo "ENCRYPTION_KEY=\"$(openssl rand -hex 32)\"" >> .env
-# (then fill in Clerk + marketplace secrets)
+# Generate a key in the terminal (64 hex chars). Paste the OUTPUT into .env —
+# do not put the literal text "$(openssl rand -hex 32)" inside .env; it will not run.
+openssl rand -hex 32
+# Set ENCRYPTION_KEY="paste-the-64-char-output-here"
 
-# 4. Run migrations
-npx prisma migrate dev --name init
+# 4. Clerk + webhook secrets: fill in `.env` after creating a Clerk application.
 
-# 5. Run app + workers in parallel
+# 5. Run migrations
+npx prisma migrate dev
+
+# 6. Next.js + workers together (queues need Redis)
 npm run dev:all
 ```
 
 App is at <http://localhost:3000>.
+
+**No Docker?** Install Postgres and Redis yourself; set `DATABASE_URL` and `REDIS_URL` in `.env`. If PostgreSQL uses a non-default port (e.g. `5433`), align `DATABASE_URL` with it.
 
 ## Layout
 

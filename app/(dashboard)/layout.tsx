@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { getCurrentCompany } from '@/lib/auth'
 import { Sidebar } from './_components/sidebar'
+import { HelpPanel } from './_components/help-panel'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { userId, orgId } = await auth()
@@ -30,7 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1">
+      <div className="flex flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-border bg-bg-subtle px-6 py-3">
           <div className="flex items-center gap-3">
             <OrganizationSwitcher hidePersonal />
@@ -42,8 +43,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <UserButton afterSignOutUrl="/" />
           </div>
         </header>
-        <div className="mx-auto max-w-7xl px-6 py-8">{children}</div>
-      </main>
+        <div className="flex flex-1">
+          <main className="flex-1 overflow-x-hidden">
+            <div className="mx-auto max-w-7xl px-6 py-8">{children}</div>
+          </main>
+          <HelpPanel />
+        </div>
+      </div>
     </div>
   )
 }

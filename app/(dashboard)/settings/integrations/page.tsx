@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import { requireCompany } from '@/lib/auth'
 import { relativeTime } from '@/lib/utils'
@@ -48,13 +49,22 @@ export default async function IntegrationsPage() {
 
   const byPlatform = Object.fromEntries(creds.map((c) => [c.platform, c]))
 
+  const anyConnected = creds.length > 0
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Integrations</h1>
-        <p className="text-sm text-gray-400">
-          Connect a marketplace to start syncing stock. Credentials are encrypted at rest with AES-256-GCM.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Integrations</h1>
+          <p className="text-sm text-gray-400">
+            Connect a marketplace to start syncing stock. Credentials are encrypted at rest with AES-256-GCM.
+          </p>
+        </div>
+        {anyConnected ? (
+          <Link href="/products/import" className="btn-primary">
+            Pazaryerinden ürün içe aktar →
+          </Link>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

@@ -100,16 +100,20 @@ export function IntegrationCard(props: {
             className="w-full max-w-md rounded-xl border border-border bg-bg-card p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-4 text-lg font-semibold">Connect {props.name}</h2>
+            <h2 className="mb-1 text-lg font-semibold">Connect {props.name}</h2>
+            <p className="mb-4 text-xs text-gray-500">
+              Test için <strong>tek bir alana</strong> <code className="rounded bg-bg-subtle px-1">MOCK</code> yaz —
+              gerçek API yerine 30 sahte ürünle çalışır.
+            </p>
             <form onSubmit={onSave} className="space-y-4">
-              {props.fields.map((f) => (
+              {props.fields.map((f, idx) => (
                 <div key={f.name}>
                   <label className="label">{f.label}</label>
                   <input
                     name={f.name}
                     type={f.type}
                     required={f.required}
-                    placeholder={f.placeholder}
+                    placeholder={idx === 0 ? `${f.placeholder ?? ''} — ya da MOCK` : f.placeholder}
                     className="input"
                   />
                 </div>
@@ -117,7 +121,20 @@ export function IntegrationCard(props: {
 
               {error ? <div className="text-sm text-red-400">{error}</div> : null}
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  className="mr-auto text-xs text-gray-400 hover:text-gray-100"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    const form = (e.target as HTMLElement).closest('form')
+                    if (!form) return
+                    const first = form.querySelector('input') as HTMLInputElement | null
+                    if (first) first.value = 'MOCK'
+                  }}
+                >
+                  MOCK ile doldur
+                </button>
                 <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>
                   Cancel
                 </button>

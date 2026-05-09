@@ -10,9 +10,11 @@ export async function getCurrentCompany() {
   const { orgId, userId } = await auth()
   if (!orgId || !userId) return null
 
-  let company = await prisma.company.findUnique({
-    where: { clerkOrgId: orgId },
-  })
+  // Use upsert + retry-on-find to avoid a race when Next.js runs server
+  // components in parallel (RSC streams) and two of them hit getCurrentCompany
+  // for a brand-new org at the same time. With plain findUnique+create both
+  // would see null and the second create would fail on the unique constraint.
+  let company = await prisma.company.findUnique({ where: { clerkOrgId: orgId } })
 
   if (!company) {
     const user = await currentUser()
@@ -25,12 +27,14 @@ export async function getCurrentCompany() {
       console.warn('[auth] failed to fetch Clerk organization name:', err)
     }
 
-    company = await prisma.company.create({
-      data: {
+    company = await prisma.company.upsert({
+      where: { clerkOrgId: orgId },
+      create: {
         clerkOrgId: orgId,
         name: orgName,
         alertEmail: user?.primaryEmailAddress?.emailAddress ?? null,
       },
+      update: {},
     })
 
     // Mirror the Clerk user into our User table.

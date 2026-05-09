@@ -1,6 +1,8 @@
 import crypto from 'node:crypto'
 import { PlatformApiError } from '@/lib/errors'
 import type { TrendyolCredentials } from './types'
+import type { ProductSnapshot } from './snapshot'
+import { isMockCredentials, mockTrendyolClient } from './mock'
 
 /**
  * Trendyol Marketplace API client.
@@ -9,6 +11,9 @@ import type { TrendyolCredentials } from './types'
  * Reference: https://developers.trendyol.com/
  */
 export function getTrendyolClient(credentials: TrendyolCredentials) {
+  if (isMockCredentials(credentials as unknown as Record<string, unknown>)) {
+    return mockTrendyolClient()
+  }
   const { apiKey, apiSecret, supplierId, storeName } = credentials
   const auth = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64')
   const baseUrl = `https://api.trendyol.com/sapigw/suppliers/${supplierId}`
@@ -61,6 +66,54 @@ export function getTrendyolClient(credentials: TrendyolCredentials) {
         method: 'POST',
         body: JSON.stringify({ reasonId }),
       })
+    },
+
+    /**
+     * List all supplier products with pagination. Trendyol uses page+size;
+     * we yield until we exhaust totalPages or hit a hard cap.
+     */
+    async listProducts(maxPages = 50): Promise<ProductSnapshot[]> {
+      const out: ProductSnapshot[] = []
+      const size = 200
+      let page = 0
+
+      while (page < maxPages) {
+        const qs = new URLSearchParams({ page: String(page), size: String(size) })
+        const res = await request<{
+          content?: Array<{
+            id?: string | number
+            barcode?: string
+            stockCode?: string
+            productMainId?: string
+            title?: string
+            quantity?: number
+          }>
+          totalPages?: number
+        }>(`/products?${qs.toString()}`)
+
+        const items = res.content ?? []
+        for (const it of items) {
+          const rawSku = String(it.stockCode ?? it.productMainId ?? it.barcode ?? '').trim()
+          if (!rawSku) continue
+          out.push({
+            platform: 'trendyol',
+            // Trendyol identifies inventory updates by barcode in our updateStock call,
+            // so prefer barcode for the platformProductId.
+            platformProductId: String(it.barcode ?? it.id ?? rawSku),
+            sku: rawSku.toLowerCase(),
+            rawSku,
+            barcode: it.barcode ?? null,
+            name: it.title ?? rawSku,
+            stock: typeof it.quantity === 'number' ? it.quantity : 0,
+          })
+        }
+
+        if (items.length < size) break
+        if (typeof res.totalPages === 'number' && page + 1 >= res.totalPages) break
+        page += 1
+      }
+
+      return out
     },
   }
 }

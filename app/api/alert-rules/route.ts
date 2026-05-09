@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { requireCompany } from '@/lib/auth'
+import { internalApiError } from '@/lib/api-response'
 
 export const runtime = 'nodejs'
 
@@ -26,8 +27,7 @@ export async function GET() {
     return NextResponse.json({ rules })
   } catch (err) {
     if (err instanceof Response) return err
-    console.error('[GET /api/alert-rules]', err)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    return internalApiError('[GET /api/alert-rules]', err)
   }
 }
 
@@ -49,7 +49,6 @@ export async function POST(req: NextRequest) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation failed', issues: err.flatten() }, { status: 400 })
     }
-    console.error('[POST /api/alert-rules]', err)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    return internalApiError('[POST /api/alert-rules]', err)
   }
 }

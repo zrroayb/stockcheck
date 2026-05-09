@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { requireCompany } from '@/lib/auth'
 import { adjustStock, triggerPlatformSync } from '@/lib/stock-engine'
 import { InsufficientStockError } from '@/lib/errors'
+import { internalApiError } from '@/lib/api-response'
 
 export const runtime = 'nodejs'
 
@@ -48,7 +49,6 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       )
     }
-    console.error('[POST /api/stock/adjust]', err)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    return internalApiError('[POST /api/stock/adjust]', err)
   }
 }

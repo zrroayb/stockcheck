@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { decryptJSON, encryptJSON } from '@/lib/encrypt'
+import { isMockCredentials, MOCK_MARKER } from './mock'
 import {
   credentialsByPlatform,
   type AnyCredentials,
@@ -10,15 +11,31 @@ import {
 
 export type PlatformName = 'trendyol' | 'shopify' | 'hepsiburada'
 
+// Per-platform set of required field names — used to fully populate a mock
+// credential blob when the user provides only a single MOCK field (or
+// types MOCK in different fields). Means real schema validation can be
+// skipped while still producing a valid, consistent stored shape.
+const MOCK_FIELDS: Record<PlatformName, string[]> = {
+  trendyol: ['apiKey', 'apiSecret', 'supplierId'],
+  shopify: ['accessToken', 'storeUrl', 'locationId'],
+  hepsiburada: ['username', 'password', 'merchantId'],
+}
+
 export async function saveCredentials(
   companyId: string,
   platform: PlatformName,
   raw: unknown
 ): Promise<void> {
-  const schema = credentialsByPlatform[platform]
-  const parsed = schema.parse(raw)
-  const encryptedData = encryptJSON(parsed)
+  let payload: Record<string, unknown>
 
+  if (raw && typeof raw === 'object' && isMockCredentials(raw as Record<string, unknown>)) {
+    // Mock mode: store a uniform MOCK blob, skip strict validation.
+    payload = Object.fromEntries(MOCK_FIELDS[platform].map((k) => [k, MOCK_MARKER]))
+  } else {
+    payload = credentialsByPlatform[platform].parse(raw) as Record<string, unknown>
+  }
+
+  const encryptedData = encryptJSON(payload)
   await prisma.platformCredential.upsert({
     where: { companyId_platform: { companyId, platform } },
     create: { companyId, platform, encryptedData },
@@ -53,5 +70,8 @@ export async function loadCredentials(
   })
 
   const decrypted = decryptJSON(cred.encryptedData)
+  if (isMockCredentials(decrypted as Record<string, unknown>)) {
+    return decrypted as AnyCredentials['data']
+  }
   return credentialsByPlatform[platform].parse(decrypted) as AnyCredentials['data']
 }

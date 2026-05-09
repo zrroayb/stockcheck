@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import { requireCompany } from '@/lib/auth'
-import { formatNumber, relativeTime } from '@/lib/utils'
+import { formatNumber } from '@/lib/utils'
 import { CreateProductButton } from './_components/create-product-button'
+import { ProductsTable, type ProductRow } from './_components/products-table'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,6 +62,9 @@ export default async function ProductsPage({
               className="input w-72"
             />
           </form>
+          <Link href="/products/import" className="btn-secondary">
+            İçe aktar
+          </Link>
           <CreateProductButton />
         </div>
       </div>
@@ -68,58 +72,24 @@ export default async function ProductsPage({
       {products.length === 0 ? (
         <EmptyState hasSearch={Boolean(search)} />
       ) : (
-        <div className="table-wrap">
-          <table className="table-base">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>SKU</th>
-                <th className="text-right">Stock</th>
-                <th className="text-right">Reserved</th>
-                <th className="text-right">Available</th>
-                <th>Listings</th>
-                <th>Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((p) => {
-                const available = p.stockCount - p.reservedStock
-                return (
-                  <tr key={p.id}>
-                    <td>
-                      <Link href={`/products/${p.id}`} className="font-medium text-gray-100 hover:text-white">
-                        {p.name}
-                      </Link>
-                      {p.barcode ? (
-                        <div className="text-xs text-gray-500">{p.barcode}</div>
-                      ) : null}
-                    </td>
-                    <td>
-                      <code className="rounded bg-bg-subtle px-1.5 py-0.5 text-xs text-gray-300">
-                        {p.masterSku}
-                      </code>
-                    </td>
-                    <td className="text-right tabular-nums">{formatNumber(p.stockCount)}</td>
-                    <td className="text-right tabular-nums text-gray-400">
-                      {formatNumber(p.reservedStock)}
-                    </td>
-                    <td
-                      className={`text-right tabular-nums ${
-                        available <= 0 ? 'text-red-400' : available < 5 ? 'text-amber-300' : ''
-                      }`}
-                    >
-                      {formatNumber(available)}
-                    </td>
-                    <td>
-                      <ListingChips listings={p.platformListings} />
-                    </td>
-                    <td className="text-gray-400">{relativeTime(p.updatedAt)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <ProductsTable
+          rows={products.map(
+            (p): ProductRow => ({
+              id: p.id,
+              name: p.name,
+              masterSku: p.masterSku,
+              barcode: p.barcode,
+              stockCount: p.stockCount,
+              reservedStock: p.reservedStock,
+              status: p.status,
+              updatedAt: p.updatedAt.toISOString(),
+              platformListings: p.platformListings.map((l) => ({
+                platform: l.platform,
+                syncStatus: l.syncStatus,
+              })),
+            })
+          )}
+        />
       )}
 
       {pages > 1 ? (
@@ -139,35 +109,6 @@ export default async function ProductsPage({
           </div>
         </div>
       ) : null}
-    </div>
-  )
-}
-
-function ListingChips({
-  listings,
-}: {
-  listings: Array<{ platform: string; syncStatus: string }>
-}) {
-  if (listings.length === 0) {
-    return <span className="text-xs text-gray-500">—</span>
-  }
-  return (
-    <div className="flex flex-wrap gap-1">
-      {listings.map((l) => {
-        const cls =
-          l.syncStatus === 'ok'
-            ? 'badge-ok'
-            : l.syncStatus === 'error'
-            ? 'badge-error'
-            : l.syncStatus === 'paused' || l.syncStatus === 'disabled'
-            ? 'badge-muted'
-            : 'badge-warn'
-        return (
-          <span key={l.platform} className={cls}>
-            {l.platform}
-          </span>
-        )
-      })}
     </div>
   )
 }

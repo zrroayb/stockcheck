@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { requireCompany } from '@/lib/auth'
+import { internalApiError } from '@/lib/api-response'
 
 export const runtime = 'nodejs'
 
@@ -35,8 +36,7 @@ export async function GET(_req: NextRequest, ctx: { params: { id: string } }) {
     return NextResponse.json({ product })
   } catch (err) {
     if (err instanceof Response) return err
-    console.error('[GET /api/products/:id]', err)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    return internalApiError('[GET /api/products/:id]', err)
   }
 }
 
@@ -61,8 +61,7 @@ export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation failed', issues: err.flatten() }, { status: 400 })
     }
-    console.error('[PATCH /api/products/:id]', err)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    return internalApiError('[PATCH /api/products/:id]', err)
   }
 }
 
@@ -78,7 +77,6 @@ export async function DELETE(_req: NextRequest, ctx: { params: { id: string } })
     return NextResponse.json({ ok: true })
   } catch (err) {
     if (err instanceof Response) return err
-    console.error('[DELETE /api/products/:id]', err)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    return internalApiError('[DELETE /api/products/:id]', err)
   }
 }
