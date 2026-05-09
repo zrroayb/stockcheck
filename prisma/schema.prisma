@@ -1,0 +1,173 @@
+// Stokkontrol — single source of truth for product stock.
+//
+// Design rules:
+//   * Product.stockCount is the only authoritative stock number. Never write to
+//     it outside of lib/stock-engine.ts.
+//   * StockEvent is append-only — it is the audit ledger. Reconstruct any
+//     product's stock by SUM(quantityDelta) over its events.
+//   * PlatformListing.stockOnPlatform is the value we last pushed to the
+//     marketplace; the sync worker uses it to short-circuit no-op pushes.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id          String   @id @default(uuid())
+  clerkOrgId  String   @unique
+  name        String
+  plan        String   @default("free") // free | pro | enterprise
+  alertEmail  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users               User[]
+  products            Product[]
+  orders              Order[]
+  platformCredentials PlatformCredential[]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  clerkId   String   @unique
+  companyId String
+  email     String
+  role      String   @default("member") // admin | member | viewer
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  companyId     String
+  masterSku     String
+  barcode       String?
+  name          String
+  stockCount    Int      @default(0) // SINGLE SOURCE OF TRUTH
+  reservedStock Int      @default(0) // held back from online sales
+  status        String   @default("active") // active | paused | archived
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  variants         ProductVariant[]
+  platformListings PlatformListing[]
+  stockEvents      StockEvent[]
+  orderItems       OrderItem[]
+  alertRules       AlertRule[]
+
+  @@unique([companyId, masterSku])
+  @@index([companyId, status])
+}
+
+model ProductVariant {
+  id         String @id @default(uuid())
+  productId  String
+  sku        String
+  attributes Json
+  stockDelta Int    @default(0) // offset from parent stockCount (advanced; keep at 0 for now)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model PlatformListing {
+  id                String    @id @default(uuid())
+  productId         String
+  platform          String // "trendyol" | "shopify" | "hepsiburada"
+  platformProductId String
+  platformSku       String?
+  stockOnPlatform   Int       @default(0)
+  syncStatus        String    @default("ok") // ok | pending | error | paused | disabled
+  lastSyncedAt      DateTime?
+  errorMessage      String?
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, platform])
+  @@index([platform, syncStatus])
+  @@index([platform, platformSku])
+}
+
+model PlatformCredential {
+  id            String    @id @default(uuid())
+  companyId     String
+  platform      String // "trendyol" | "shopify" | "hepsiburada"
+  encryptedData String // AES-256-GCM JSON blob
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, platform])
+}
+
+model Order {
+  id              String   @id @default(uuid())
+  companyId       String
+  platform        String
+  platformOrderId String
+  status          String   @default("received") // received | fulfilled | cancelled | partially_cancelled
+  receivedAt      DateTime @default(now())
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items       OrderItem[]
+  stockEvents StockEvent[]
+
+  @@unique([companyId, platform, platformOrderId])
+  @@index([companyId, receivedAt])
+}
+
+model OrderItem {
+  id          String @id @default(uuid())
+  orderId     String
+  productId   String
+  quantity    Int
+  platformSku String
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model StockEvent {
+  id             String   @id @default(uuid())
+  productId      String
+  orderId        String?
+  sourcePlatform String // "trendyol" | "shopify" | "hepsiburada" | "manual" | "system"
+  eventType      String // "order_deduct" | "return_credit" | "manual_adjust" | "import" | "correction" | "cancelled"
+  quantityDelta  Int
+  note           String?
+  occurredAt     DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  @@index([productId, occurredAt])
+  @@index([orderId])
+}
+
+model AlertRule {
+  id        String  @id @default(uuid())
+  productId String
+  ruleType  String // "low_stock" | "out_of_stock" | "overstock"
+  threshold Int
+  action    String // "notify_email" | "pause_listings" | "notify_slack"
+  enabled   Boolean @default(true)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, enabled])
+}

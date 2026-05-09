@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: #0b0d12;
+  color: #e8eaf0;
+  min-height: 100%;
+}
+
+body {
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tiny scrollbar tweak */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #1f2430;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2a3140;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-border bg-bg-card p-5;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-accent-fg hover:bg-indigo-500;
+  }
+  .btn-secondary {
+    @apply btn border border-border bg-bg-subtle text-gray-200 hover:bg-bg-card;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-500;
+  }
+  .input {
+    @apply w-full rounded-md border border-border bg-bg-subtle px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wider text-gray-400;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+  .badge-ok {
+    @apply badge bg-emerald-900/40 text-emerald-300;
+  }
+  .badge-warn {
+    @apply badge bg-amber-900/40 text-amber-300;
+  }
+  .badge-error {
+    @apply badge bg-red-900/40 text-red-300;
+  }
+  .badge-muted {
+    @apply badge bg-gray-700/40 text-gray-300;
+  }
+  .table-wrap {
+    @apply overflow-hidden rounded-xl border border-border bg-bg-card;
+  }
+  .table-base {
+    @apply w-full text-left text-sm;
+  }
+  .table-base thead {
+    @apply bg-bg-subtle text-xs uppercase tracking-wider text-gray-400;
+  }
+  .table-base th,
+  .table-base td {
+    @apply px-4 py-3;
+  }
+  .table-base tbody tr {
+    @apply border-t border-border hover:bg-bg-subtle/50;
+  }
+}
