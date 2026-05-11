@@ -8,6 +8,20 @@ import { ThemeToggle } from '@/app/_components/theme-toggle'
 import { Sidebar } from './_components/sidebar'
 import { HelpPanel } from './_components/help-panel'
 
+const appEnv = process.env.NEXT_PUBLIC_APP_ENV ?? process.env.APP_ENV ?? 'development'
+
+function getEnvBadgeClass() {
+  if (appEnv === 'production') {
+    return 'border-red-400/35 bg-red-500/10 text-red-200'
+  }
+
+  if (appEnv === 'staging') {
+    return 'border-amber-400/35 bg-amber-500/10 text-amber-200'
+  }
+
+  return 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200'
+}
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { userId, orgId } = await auth()
   if (!userId) redirect('/sign-in')
@@ -50,6 +64,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </form>
           </div>
           <div className="flex items-center gap-2">
+            <div className={`hidden rounded-md border px-3 py-2 text-xs font-medium uppercase md:block ${getEnvBadgeClass()}`}>
+              {appEnv}
+            </div>
             <div className="hidden items-center gap-2 rounded-md border border-white/10 bg-white/[0.035] px-3 py-2 text-xs text-gray-300 xl:flex">
               <span className="status-dot" />
               <span>Kanallar canli</span>
