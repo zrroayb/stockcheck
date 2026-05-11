@@ -1,5 +1,5 @@
 import { Queue, type QueueOptions } from 'bullmq'
-import { redis } from './redis'
+import { ensureRedisAvailable, redis } from './redis'
 
 // BullMQ disallows `:` in queue names — use kebab-case.
 export const QUEUES = {
@@ -84,6 +84,11 @@ export function syncQueue(platform: Platform) {
   })
 }
 
+async function requireRedisForQueue() {
+  if (await ensureRedisAvailable()) return
+  throw new Error('Redis unavailable; queue job was not enqueued')
+}
+
 export function cancelQueue() {
   return getQueue<CancelJobData>(QUEUES.ORDER_CANCEL, {
     attempts: 3,
@@ -112,6 +117,7 @@ export function pollQueue() {
 }
 
 export async function scheduleHepsiburadaPollingForCompany(companyId: string) {
+  await requireRedisForQueue()
   await pollQueue().add(
     `poll:${companyId}`,
     { companyId },
@@ -130,17 +136,20 @@ export async function scheduleHepsiburadaPollingForCompany(companyId: string) {
  * with redundant identical pushes when many events happen quickly.
  */
 export async function enqueueSync(data: SyncJobData) {
+  await requireRedisForQueue()
   await syncQueue(data.platform).add(`sync:${data.platform}:${data.productId}`, data, {
     jobId: `sync:${data.platform}:${data.listingId}`,
   })
 }
 
 export async function enqueueCancel(data: CancelJobData) {
+  await requireRedisForQueue()
   await cancelQueue().add(`cancel:${data.platform}:${data.platformOrderId}`, data, {
     jobId: `cancel:${data.platform}:${data.platformOrderId}`,
   })
 }
 
 export async function enqueueAlertCheck(data: AlertCheckJobData) {
+  await requireRedisForQueue()
   await alertQueue().add(`alert:${data.productId}`, data)
 }

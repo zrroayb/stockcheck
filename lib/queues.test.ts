@@ -16,6 +16,7 @@ vi.mock('bullmq', () => ({
 }))
 
 vi.mock('./redis', () => ({
+  ensureRedisAvailable: vi.fn(() => Promise.resolve(true)),
   redis: {},
 }))
 
@@ -47,5 +48,22 @@ describe('stock sync queues', () => {
       expect.objectContaining({ platform: 'shopify', listingId: 'listing-1' }),
       { jobId: 'sync:shopify:listing-1' }
     )
+  })
+
+  it('fails fast when Redis is unavailable', async () => {
+    const redisModule = await import('./redis')
+    vi.mocked(redisModule.ensureRedisAvailable).mockResolvedValueOnce(false)
+    const { enqueueSync } = await import('./queues')
+
+    await expect(
+      enqueueSync({
+        productId: 'product-1',
+        companyId: 'company-1',
+        platform: 'shopify',
+        listingId: 'listing-1',
+      })
+    ).rejects.toThrow('Redis unavailable')
+
+    expect(addMock).not.toHaveBeenCalled()
   })
 })
