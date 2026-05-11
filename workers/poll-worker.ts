@@ -1,13 +1,11 @@
 import { Worker } from 'bullmq'
 import { redis } from '../lib/redis'
 import { prisma } from '../lib/db'
-import { QUEUES, pollQueue, type PollJobData } from '../lib/queues'
+import { QUEUES, scheduleHepsiburadaPollingForCompany, type PollJobData } from '../lib/queues'
 import { getHepsiburadaClient } from '../lib/platforms/hepsiburada'
 import { decryptJSON } from '../lib/encrypt'
 import type { HepsiburadaCredentials } from '../lib/platforms/types'
 import { processIncomingOrder } from '../lib/webhooks/process-order'
-
-const POLL_INTERVAL_MS = 60_000
 
 /**
  * Hepsiburada webhooks are unreliable, so we poll every 60s for any orders
@@ -77,15 +75,7 @@ export async function scheduleHepsiburadaPolling(): Promise<void> {
     select: { companyId: true },
   })
 
-  const queue = pollQueue()
   for (const c of companies) {
-    await queue.add(
-      `poll:${c.companyId}`,
-      { companyId: c.companyId },
-      {
-        repeat: { every: POLL_INTERVAL_MS },
-        jobId: `poll:${c.companyId}`,
-      }
-    )
+    await scheduleHepsiburadaPollingForCompany(c.companyId)
   }
 }

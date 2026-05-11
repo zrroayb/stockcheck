@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { AlertTriangle, CheckCircle2, PauseCircle, RadioTower } from 'lucide-react'
 import { cn, formatNumber, relativeTime } from '@/lib/utils'
 
 export type ProductRow = {
@@ -64,7 +65,7 @@ export function ProductsTable({ rows }: { rows: ProductRow[] }) {
         text:
           data.failed > 0
             ? `${data.ok} başarılı, ${data.failed} başarısız${
-                data.errors?.length ? ` — ilki: ${data.errors[0].error}` : ''
+                data.errors?.length ? ` - ilki: ${data.errors[0].error}` : ''
               }`
             : `${data.ok} ürün güncellendi`,
       })
@@ -106,30 +107,29 @@ export function ProductsTable({ rows }: { rows: ProductRow[] }) {
                     if (el) el.indeterminate = someSelected
                   }}
                   onChange={toggleAll}
-                  className="h-4 w-4 accent-indigo-500"
+                  className="h-4 w-4 accent-amber-400"
                 />
               </th>
-              <th>Product</th>
+              <th>Urun</th>
               <th>SKU</th>
-              <th className="text-right">Stock</th>
-              <th className="text-right">Reserved</th>
-              <th className="text-right">Available</th>
-              <th>Listings</th>
-              <th>Updated</th>
+              <th>Satisa hazirlik</th>
+              <th className="text-right">Rezerve</th>
+              <th>Kanallar</th>
+              <th>Guncel</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((p) => {
-              const available = p.stockCount - p.reservedStock
+              const available = Math.max(0, p.stockCount - p.reservedStock)
               const isSelected = selected.has(p.id)
               return (
-                <tr key={p.id} className={cn(isSelected && 'bg-indigo-500/5')}>
+                <tr key={p.id} className={cn(isSelected && 'bg-amber-400/5')}>
                   <td>
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => toggleOne(p.id)}
-                      className="h-4 w-4 accent-indigo-500"
+                      className="h-4 w-4 accent-amber-400"
                     />
                   </td>
                   <td>
@@ -143,17 +143,11 @@ export function ProductsTable({ rows }: { rows: ProductRow[] }) {
                       {p.masterSku}
                     </code>
                   </td>
-                  <td className="text-right tabular-nums">{formatNumber(p.stockCount)}</td>
+                  <td>
+                    <StockSignal stock={p.stockCount} reserved={p.reservedStock} available={available} />
+                  </td>
                   <td className="text-right tabular-nums text-gray-400">
                     {formatNumber(p.reservedStock)}
-                  </td>
-                  <td
-                    className={cn(
-                      'text-right tabular-nums',
-                      available <= 0 ? 'text-red-400' : available < 5 ? 'text-amber-300' : ''
-                    )}
-                  >
-                    {formatNumber(available)}
                   </td>
                   <td>
                     <ListingChips listings={p.platformListings} />
@@ -169,11 +163,47 @@ export function ProductsTable({ rows }: { rows: ProductRow[] }) {
   )
 }
 
+function StockSignal({
+  stock,
+  reserved,
+  available,
+}: {
+  stock: number
+  reserved: number
+  available: number
+}) {
+  const ratio = stock <= 0 ? 0 : Math.min(100, Math.max(0, (available / stock) * 100))
+  const tone =
+    available <= 0 ? 'text-red-300' : available < 5 ? 'text-amber-300' : 'text-emerald-300'
+  return (
+    <div className="min-w-44 max-w-64">
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <span className={cn('font-medium tabular-nums', tone)}>{formatNumber(available)} satilabilir</span>
+        <span className="text-xs tabular-nums text-gray-500">{formatNumber(stock)} toplam</span>
+      </div>
+      <div className="progress-track">
+        <div className="progress-fill" style={{ width: `${ratio}%` }} />
+      </div>
+      {reserved > 0 ? (
+        <div className="mt-1 text-[11px] text-gray-500">{formatNumber(reserved)} rezerve</div>
+      ) : null}
+    </div>
+  )
+}
+
 function ListingChips({ listings }: { listings: ProductRow['platformListings'] }) {
   if (listings.length === 0) return <span className="text-xs text-gray-500">—</span>
   return (
     <div className="flex flex-wrap gap-1">
       {listings.map((l) => {
+        const Icon =
+          l.syncStatus === 'ok'
+            ? CheckCircle2
+            : l.syncStatus === 'error'
+            ? AlertTriangle
+            : l.syncStatus === 'paused' || l.syncStatus === 'disabled'
+            ? PauseCircle
+            : RadioTower
         const cls =
           l.syncStatus === 'ok'
             ? 'badge-ok'
@@ -183,7 +213,8 @@ function ListingChips({ listings }: { listings: ProductRow['platformListings'] }
             ? 'badge-muted'
             : 'badge-warn'
         return (
-          <span key={l.platform} className={cls}>
+          <span key={l.platform} className={cn(cls, 'gap-1.5')}>
+            <Icon className="h-3 w-3" />
             {l.platform}
           </span>
         )
@@ -207,7 +238,7 @@ function BulkToolbar({
   const [val, setVal] = useState<number>(0)
 
   return (
-    <div className="card sticky top-2 z-10 flex flex-wrap items-center gap-3 border-indigo-500/40 bg-indigo-500/10 shadow-lg shadow-black/30">
+    <div className="card sticky top-2 z-10 flex flex-wrap items-center gap-3 border-amber-400/35 bg-amber-400/10 shadow-lg shadow-black/30">
       <div className="text-sm">
         <strong className="tabular-nums">{count}</strong> ürün seçili
       </div>
@@ -243,7 +274,7 @@ function BulkToolbar({
               className="btn-secondary text-xs"
               disabled={busy}
             >
-              Reserved set et
+              Rezerve set et
             </button>
             <span className="mx-1 h-5 w-px bg-border" />
             <button
@@ -275,7 +306,7 @@ function BulkToolbar({
                   ? 'Yeni stok'
                   : mode === 'adjust_stock'
                   ? 'Δ (+5 / -3)'
-                  : 'Reserved'
+                  : 'Rezerve'
               }
             />
             <button
@@ -292,7 +323,7 @@ function BulkToolbar({
               className="btn-primary text-xs"
               disabled={busy || (mode === 'adjust_stock' ? val === 0 : val < 0)}
             >
-              {busy ? 'Uygulanıyor…' : 'Uygula'}
+              {busy ? 'Uygulaniyor...' : 'Uygula'}
             </button>
             <button onClick={() => setMode(null)} className="btn-secondary text-xs" disabled={busy}>
               İptal

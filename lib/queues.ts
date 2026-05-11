@@ -3,7 +3,9 @@ import { redis } from './redis'
 
 // BullMQ disallows `:` in queue names — use kebab-case.
 export const QUEUES = {
-  STOCK_SYNC: 'stock-sync',
+  STOCK_SYNC_TRENDYOL: 'stock-sync-trendyol',
+  STOCK_SYNC_SHOPIFY: 'stock-sync-shopify',
+  STOCK_SYNC_HEPSIBURADA: 'stock-sync-hepsiburada',
   ORDER_CANCEL: 'order-cancel',
   ALERT_CHECK: 'alert-check',
   POLL_HEPSIBURADA: 'poll-hepsiburada',
@@ -16,6 +18,8 @@ export type SyncJobData = {
   companyId: string
   platform: Platform
   listingId: string
+  overrideStock?: number
+  pauseAfterSync?: boolean
 }
 
 export type CancelJobData = {
@@ -47,6 +51,7 @@ export type PollJobData = {
 // ---------------------------------------------------------------------------
 
 const queueCache = new Map<string, Queue>()
+const POLL_HEPSIBURADA_INTERVAL_MS = 60_000
 
 function getQueue<T>(name: string, defaultJobOptions?: QueueOptions['defaultJobOptions']): Queue<T> {
   const cached = queueCache.get(name) as Queue<T> | undefined
@@ -59,8 +64,19 @@ function getQueue<T>(name: string, defaultJobOptions?: QueueOptions['defaultJobO
   return queue
 }
 
-export function syncQueue() {
-  return getQueue<SyncJobData>(QUEUES.STOCK_SYNC, {
+export function syncQueueName(platform: Platform): string {
+  switch (platform) {
+    case 'trendyol':
+      return QUEUES.STOCK_SYNC_TRENDYOL
+    case 'shopify':
+      return QUEUES.STOCK_SYNC_SHOPIFY
+    case 'hepsiburada':
+      return QUEUES.STOCK_SYNC_HEPSIBURADA
+  }
+}
+
+export function syncQueue(platform: Platform) {
+  return getQueue<SyncJobData>(syncQueueName(platform), {
     attempts: 3,
     backoff: { type: 'exponential', delay: 5000 }, // 5s, 25s, 125s
     removeOnComplete: 100,
@@ -95,6 +111,17 @@ export function pollQueue() {
   })
 }
 
+export async function scheduleHepsiburadaPollingForCompany(companyId: string) {
+  await pollQueue().add(
+    `poll:${companyId}`,
+    { companyId },
+    {
+      repeat: { every: POLL_HEPSIBURADA_INTERVAL_MS },
+      jobId: `poll:${companyId}`,
+    }
+  )
+}
+
 /**
  * Enqueue a stock sync for one (product, platform) listing.
  *
@@ -103,7 +130,7 @@ export function pollQueue() {
  * with redundant identical pushes when many events happen quickly.
  */
 export async function enqueueSync(data: SyncJobData) {
-  await syncQueue().add(`sync:${data.platform}:${data.productId}`, data, {
+  await syncQueue(data.platform).add(`sync:${data.platform}:${data.productId}`, data, {
     jobId: `sync:${data.platform}:${data.listingId}`,
   })
 }

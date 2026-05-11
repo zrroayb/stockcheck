@@ -45,7 +45,7 @@ export function CreateAlertRule({ products }: { products: Product[] }) {
   return (
     <>
       <button onClick={() => setOpen(true)} className="btn-primary" disabled={products.length === 0}>
-        + New rule
+        + Otomasyon kur
       </button>
 
       {open ? (
@@ -57,38 +57,37 @@ export function CreateAlertRule({ products }: { products: Product[] }) {
             className="w-full max-w-md rounded-xl border border-border bg-bg-card p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-4 text-lg font-semibold">New alert rule</h2>
+            <h2 className="mb-4 text-lg font-semibold">Yeni stok otomasyonu</h2>
             <form onSubmit={onSubmit} className="space-y-4">
               <div>
-                <label className="label">Product</label>
+                <label className="label">Urun</label>
                 <select name="productId" required className="input">
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} — {p.masterSku}
+                      {p.name} - {p.masterSku}
                     </option>
                   ))}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label">Type</label>
+                  <label className="label">Kural</label>
                   <select name="ruleType" required className="input" defaultValue="low_stock">
-                    <option value="low_stock">Low stock</option>
-                    <option value="out_of_stock">Out of stock</option>
-                    <option value="overstock">Overstock</option>
+                    <option value="low_stock">Dusuk stok</option>
+                    <option value="out_of_stock">Stok bitti</option>
+                    <option value="overstock">Fazla stok</option>
                   </select>
                 </div>
                 <div>
-                  <label className="label">Threshold</label>
+                  <label className="label">Esik</label>
                   <input name="threshold" type="number" min={0} defaultValue={5} className="input" />
                 </div>
               </div>
               <div>
-                <label className="label">Action</label>
+                <label className="label">Aksiyon</label>
                 <select name="action" required className="input" defaultValue="notify_email">
-                  <option value="notify_email">Notify by email</option>
-                  <option value="pause_listings">Pause listings (push 0 stock)</option>
-                  <option value="notify_slack">Notify Slack (coming soon)</option>
+                  <option value="notify_email">E-posta ile uyar</option>
+                  <option value="pause_listings">Kanallarda 0 stok push et</option>
                 </select>
               </div>
 
@@ -96,10 +95,10 @@ export function CreateAlertRule({ products }: { products: Product[] }) {
 
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>
-                  Cancel
+                  Iptal
                 </button>
                 <button type="submit" className="btn-primary" disabled={submitting}>
-                  {submitting ? 'Creating…' : 'Create rule'}
+                  {submitting ? 'Kuruluyor...' : 'Kural olustur'}
                 </button>
               </div>
             </form>

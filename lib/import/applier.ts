@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { decryptJSON } from '@/lib/encrypt'
 import { enqueueSync } from '@/lib/queues'
+import { setStockCount } from '@/lib/stock-engine'
 import { getTrendyolClient } from '@/lib/platforms/trendyol'
 import { getShopifyClient } from '@/lib/platforms/shopify'
 import { getHepsiburadaClient } from '@/lib/platforms/hepsiburada'
@@ -54,30 +55,36 @@ export async function applyImport(
 
   for (const item of plan.items) {
     try {
-      const product = await prisma.$transaction(async (tx) => {
-        // Upsert the master Product. We treat masterSku as the canonical key
-        // (companyId + masterSku is unique by schema). Stock count is set to
-        // the user's chosen value; if the product existed already with a
-        // different stock we want it to converge to the chosen value.
-        const product = await tx.product.upsert({
+      const importNote = `Imported from ${item.snapshots.map((s) => s.platform).join(', ')}`
+      const { product, created } = await prisma.$transaction(async (tx) => {
+        // Treat masterSku as the canonical key (companyId + masterSku is
+        // unique by schema). Existing product stock is reconciled below via
+        // the stock engine so the audit ledger gets a delta event.
+        const existing = await tx.product.findUnique({
           where: { companyId_masterSku: { companyId, masterSku: item.rawSku } },
-          create: {
-            companyId,
-            masterSku: item.rawSku,
-            name: item.name,
-            barcode: item.barcode,
-            stockCount: item.chosenStock,
-            reservedStock: item.reservedStock ?? 0,
-          },
-          update: {
-            name: item.name,
-            barcode: item.barcode,
-            stockCount: item.chosenStock,
-            ...(typeof item.reservedStock === 'number'
-              ? { reservedStock: item.reservedStock }
-              : {}),
-          },
         })
+
+        const product = existing
+          ? await tx.product.update({
+              where: { id: existing.id },
+              data: {
+                name: item.name,
+                barcode: item.barcode,
+                ...(typeof item.reservedStock === 'number'
+                  ? { reservedStock: item.reservedStock }
+                  : {}),
+              },
+            })
+          : await tx.product.create({
+              data: {
+                companyId,
+                masterSku: item.rawSku,
+                name: item.name,
+                barcode: item.barcode,
+                stockCount: item.chosenStock,
+                reservedStock: item.reservedStock ?? 0,
+              },
+            })
 
         // One listing per snapshot.
         for (const snap of item.snapshots) {
@@ -102,20 +109,31 @@ export async function applyImport(
           })
         }
 
-        // Audit ledger entry. Quantity reflects the absolute new stock so a
-        // SUM over StockEvent still reproduces stockCount even after import.
-        await tx.stockEvent.create({
-          data: {
-            productId: product.id,
-            sourcePlatform: 'manual',
-            eventType: 'import',
-            quantityDelta: item.chosenStock,
-            note: `Imported from ${item.snapshots.map((s) => s.platform).join(', ')}`,
-          },
-        })
+        if (!existing && item.chosenStock > 0) {
+          // Initial stock for a new product is an absolute first ledger entry.
+          await tx.stockEvent.create({
+            data: {
+              productId: product.id,
+              sourcePlatform: 'manual',
+              eventType: 'import',
+              quantityDelta: item.chosenStock,
+              note: importNote,
+            },
+          })
+        }
 
-        return product
+        return { product, created: !existing }
       })
+
+      if (!created) {
+        await setStockCount({
+          productId: product.id,
+          stockCount: item.chosenStock,
+          sourcePlatform: 'manual',
+          eventType: 'import',
+          note: importNote,
+        })
+      }
 
       result.productsUpserted += 1
       result.listingsUpserted += item.snapshots.length
@@ -123,6 +141,7 @@ export async function applyImport(
       // Push-back: try queue first (so production retries/rate-limits work),
       // fall back to inline push so the demo works even without Redis.
       if (plan.pushBack) {
+        const availableToPush = Math.max(0, item.chosenStock - (item.reservedStock ?? 0))
         for (const snap of item.snapshots) {
           const listing = await prisma.platformListing.findUnique({
             where: { productId_platform: { productId: product.id, platform: snap.platform } },
@@ -147,11 +166,11 @@ export async function applyImport(
               )
             } else {
               try {
-                await pushInline(snap.platform, snap.platformProductId, item.chosenStock, enc)
+                await pushInline(snap.platform, snap.platformProductId, availableToPush, enc)
                 await prisma.platformListing.update({
                   where: { id: listing.id },
                   data: {
-                    stockOnPlatform: item.chosenStock,
+                    stockOnPlatform: availableToPush,
                     syncStatus: 'ok',
                     lastSyncedAt: new Date(),
                     errorMessage: null,

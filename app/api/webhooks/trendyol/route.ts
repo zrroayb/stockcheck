@@ -3,7 +3,6 @@ import { z } from 'zod'
 import { verifyTrendyolWebhook } from '@/lib/platforms/trendyol'
 import { processIncomingOrder } from '@/lib/webhooks/process-order'
 import { prisma } from '@/lib/db'
-import { decryptJSON } from '@/lib/encrypt'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -15,6 +14,9 @@ const trendyolOrderPayload = z.object({
   supplierId: z.union([z.string(), z.number()]).optional(),
   lines: z.array(
     z.object({
+      id: z.union([z.string(), z.number()]).optional(),
+      lineId: z.union([z.string(), z.number()]).optional(),
+      orderLineId: z.union([z.string(), z.number()]).optional(),
       sku: z.string().optional(),
       barcode: z.string().optional(),
       quantity: z.number().int().positive(),
@@ -60,6 +62,7 @@ export async function POST(req: NextRequest) {
         // Prefer SKU; fall back to barcode (Trendyol uses both)
         platformSku: (l.sku ?? l.barcode ?? '').trim(),
         quantity: l.quantity,
+        cancelReference: stringifyLineId(l.orderLineId ?? l.lineId ?? l.id),
       }))
       .filter((l) => l.platformSku.length > 0),
   })
@@ -67,16 +70,22 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, ...result })
 }
 
+function stringifyLineId(value: string | number | undefined): string | undefined {
+  if (typeof value === 'undefined') return undefined
+  const lineId = String(value).trim()
+  return lineId.length > 0 ? lineId : undefined
+}
+
 async function resolveTrendyolCompany(supplierId: string | null): Promise<string | null> {
   if (!supplierId) return null
-  const creds = await prisma.platformCredential.findMany({ where: { platform: 'trendyol' } })
-  for (const c of creds) {
-    try {
-      const data = decryptJSON<{ supplierId: string }>(c.encryptedData)
-      if (String(data.supplierId) === supplierId) return c.companyId
-    } catch {
-      // skip
-    }
-  }
-  return null
+  const cred = await prisma.platformCredential.findUnique({
+    where: {
+      platform_externalAccountId: {
+        platform: 'trendyol',
+        externalAccountId: supplierId.trim().toLowerCase(),
+      },
+    },
+    select: { companyId: true },
+  })
+  return cred?.companyId ?? null
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { requireCompany } from '@/lib/auth'
+import { pausePlatformListings, triggerPlatformSync } from '@/lib/stock-engine'
 import { internalApiError } from '@/lib/api-response'
 
 export const runtime = 'nodejs'
@@ -49,11 +50,37 @@ export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
       where: { id: ctx.params.id, companyId: company.id },
     })
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (
+      typeof body.reservedStock === 'number' &&
+      body.reservedStock > existing.stockCount
+    ) {
+      return NextResponse.json(
+        { error: 'Reserved stock cannot exceed total stock' },
+        { status: 400 }
+      )
+    }
 
     const product = await prisma.product.update({
       where: { id: ctx.params.id },
       data: body,
     })
+
+    if (
+      typeof body.reservedStock === 'number' &&
+      body.reservedStock !== existing.reservedStock
+    ) {
+      await triggerPlatformSync(product.id, company.id)
+    }
+    if (body.status === 'paused' && existing.status !== 'paused') {
+      await pausePlatformListings(product.id, company.id)
+    }
+    if (body.status === 'active' && existing.status === 'paused') {
+      await prisma.platformListing.updateMany({
+        where: { productId: product.id, syncStatus: 'paused' },
+        data: { syncStatus: 'pending' },
+      })
+      await triggerPlatformSync(product.id, company.id)
+    }
 
     return NextResponse.json({ product })
   } catch (err) {

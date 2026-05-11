@@ -18,13 +18,13 @@ datasource db {
 }
 
 model Company {
-  id          String   @id @default(uuid())
-  clerkOrgId  String   @unique
-  name        String
-  plan        String   @default("free") // free | pro | enterprise
-  alertEmail  String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  clerkOrgId String   @unique
+  name       String
+  plan       String   @default("free") // free | pro | enterprise
+  alertEmail String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   users               User[]
   products            Product[]
@@ -99,17 +99,19 @@ model PlatformListing {
 }
 
 model PlatformCredential {
-  id            String    @id @default(uuid())
-  companyId     String
-  platform      String // "trendyol" | "shopify" | "hepsiburada"
-  encryptedData String // AES-256-GCM JSON blob
-  expiresAt     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String    @id @default(uuid())
+  companyId         String
+  platform          String // "trendyol" | "shopify" | "hepsiburada"
+  externalAccountId String? // supplierId | storeUrl | merchantId, plain for webhook lookup
+  encryptedData     String // AES-256-GCM JSON blob
+  expiresAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, platform])
+  @@unique([platform, externalAccountId])
 }
 
 model Order {
@@ -117,8 +119,10 @@ model Order {
   companyId       String
   platform        String
   platformOrderId String
-  status          String   @default("received") // received | fulfilled | cancelled | partially_cancelled
+  status          String   @default("processing") // processing | received | fulfilled | cancelled | partially_cancelled | failed
+  processingError String?
   receivedAt      DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   items       OrderItem[]
@@ -129,15 +133,19 @@ model Order {
 }
 
 model OrderItem {
-  id          String @id @default(uuid())
-  orderId     String
-  productId   String
-  quantity    Int
-  platformSku String
+  id              String    @id @default(uuid())
+  orderId         String
+  productId       String
+  quantity        Int
+  platformSku     String
+  cancelReference String?
+  status          String    @default("pending") // pending | processed | cancelled
+  processedAt     DateTime?
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
 
+  @@unique([orderId, platformSku])
   @@index([orderId])
   @@index([productId])
 }
@@ -164,7 +172,7 @@ model AlertRule {
   productId String
   ruleType  String // "low_stock" | "out_of_stock" | "overstock"
   threshold Int
-  action    String // "notify_email" | "pause_listings" | "notify_slack"
+  action    String // "notify_email" | "pause_listings"
   enabled   Boolean @default(true)
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)

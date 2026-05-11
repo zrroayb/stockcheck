@@ -9,16 +9,16 @@ const config: Config = {
     extend: {
       colors: {
         bg: {
-          DEFAULT: '#0b0d12',
-          subtle: '#10131a',
-          card: '#141821',
+          DEFAULT: '#0b0b08',
+          subtle: '#14130f',
+          card: '#181712',
         },
         border: {
-          DEFAULT: '#1f2430',
+          DEFAULT: '#29261d',
         },
         accent: {
-          DEFAULT: '#6366f1',
-          fg: '#eef2ff',
+          DEFAULT: '#14b8a6',
+          fg: '#06201d',
         },
       },
       fontFamily: {

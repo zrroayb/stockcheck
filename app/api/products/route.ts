@@ -73,6 +73,13 @@ export async function POST(req: NextRequest) {
     const company = await requireCompany()
     const body = createProductSchema.parse(await req.json())
 
+    if (body.reservedStock > body.stockCount) {
+      return NextResponse.json(
+        { error: 'Reserved stock cannot exceed total stock' },
+        { status: 400 }
+      )
+    }
+
     const product = await prisma.product.create({
       data: {
         companyId: company.id,

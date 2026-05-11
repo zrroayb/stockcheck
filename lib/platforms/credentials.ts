@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { decryptJSON, encryptJSON } from '@/lib/encrypt'
+import { scheduleHepsiburadaPollingForCompany } from '@/lib/queues'
 import { isMockCredentials, MOCK_MARKER } from './mock'
 import {
   credentialsByPlatform,
@@ -21,26 +22,51 @@ const MOCK_FIELDS: Record<PlatformName, string[]> = {
   hepsiburada: ['username', 'password', 'merchantId'],
 }
 
+export function externalAccountIdFor(
+  platform: PlatformName,
+  data: Record<string, unknown>
+): string | null {
+  const key =
+    platform === 'trendyol'
+      ? 'supplierId'
+      : platform === 'shopify'
+      ? 'storeUrl'
+      : 'merchantId'
+  const value = data[key]
+  if (typeof value !== 'string' && typeof value !== 'number') return null
+  const normalized = String(value).trim().toLowerCase()
+  return normalized.length > 0 ? normalized : null
+}
+
 export async function saveCredentials(
   companyId: string,
   platform: PlatformName,
   raw: unknown
 ): Promise<void> {
   let payload: Record<string, unknown>
+  let externalAccountId: string | null
 
   if (raw && typeof raw === 'object' && isMockCredentials(raw as Record<string, unknown>)) {
     // Mock mode: store a uniform MOCK blob, skip strict validation.
     payload = Object.fromEntries(MOCK_FIELDS[platform].map((k) => [k, MOCK_MARKER]))
+    externalAccountId = null
   } else {
     payload = credentialsByPlatform[platform].parse(raw) as Record<string, unknown>
+    externalAccountId = externalAccountIdFor(platform, payload)
   }
 
   const encryptedData = encryptJSON(payload)
   await prisma.platformCredential.upsert({
     where: { companyId_platform: { companyId, platform } },
-    create: { companyId, platform, encryptedData },
-    update: { encryptedData },
+    create: { companyId, platform, externalAccountId, encryptedData },
+    update: { externalAccountId, encryptedData },
   })
+
+  if (platform === 'hepsiburada') {
+    await scheduleHepsiburadaPollingForCompany(companyId).catch((err) => {
+      console.warn('[credentials] failed to schedule hepsiburada polling:', err)
+    })
+  }
 }
 
 export async function deleteCredentials(companyId: string, platform: PlatformName): Promise<void> {

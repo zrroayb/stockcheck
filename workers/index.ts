@@ -7,7 +7,7 @@
  * survive Next dev reloads and have predictable concurrency.
  */
 import 'dotenv/config'
-import { syncWorkers } from './sync-worker'
+import { enqueuePendingSyncs, schedulePendingSyncSweep, syncWorkers } from './sync-worker'
 import { cancelWorker } from './cancel-worker'
 import { alertWorker } from './alert-worker'
 import { pollWorker, scheduleHepsiburadaPolling } from './poll-worker'
@@ -25,8 +25,11 @@ async function main() {
   try {
     await scheduleHepsiburadaPolling()
     console.log('[workers] hepsiburada polling scheduled')
+    const pending = await enqueuePendingSyncs()
+    console.log(`[workers] pending sync sweep queued=${pending.queued} failed=${pending.failed}`)
+    schedulePendingSyncSweep()
   } catch (err) {
-    console.error('[workers] failed to schedule polling:', err)
+    console.error('[workers] failed to schedule startup jobs:', err)
   }
 
   console.log('[workers] ready.')

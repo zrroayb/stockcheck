@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Cable, RadioTower } from 'lucide-react'
 import { prisma } from '@/lib/db'
 import { requireCompany } from '@/lib/auth'
 import { relativeTime } from '@/lib/utils'
@@ -55,14 +56,20 @@ export default async function IntegrationsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Integrations</h1>
+          <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wider text-gray-500">
+            <Cable className="h-3.5 w-3.5 text-cyan-300" />
+            <span>Satis kanallari</span>
+          </div>
+          <h1 className="text-2xl font-semibold">Kanal merkezi</h1>
           <p className="text-sm text-gray-400">
-            Connect a marketplace to start syncing stock. Credentials are encrypted at rest with AES-256-GCM.
+            Pazaryerlerini bagla, urunleri iceri al ve stok operasyonunu tek ana stoktan yonet.
+            Kimlik bilgileri AES-256-GCM ile sifrelenir.
           </p>
         </div>
         {anyConnected ? (
           <Link href="/products/import" className="btn-primary">
-            Pazaryerinden ürün içe aktar →
+            <RadioTower className="h-4 w-4" />
+            Pazaryerinden urun ice aktar
           </Link>
         ) : null}
       </div>

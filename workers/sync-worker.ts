@@ -1,7 +1,7 @@
 import { Worker } from 'bullmq'
 import { redis } from '../lib/redis'
 import { prisma } from '../lib/db'
-import { QUEUES, type Platform, type SyncJobData } from '../lib/queues'
+import { enqueueSync, syncQueueName, type Platform, type SyncJobData } from '../lib/queues'
 import { getTrendyolClient } from '../lib/platforms/trendyol'
 import { getShopifyClient } from '../lib/platforms/shopify'
 import { getHepsiburadaClient } from '../lib/platforms/hepsiburada'
@@ -12,9 +12,8 @@ import {
   type HepsiburadaCredentials,
 } from '../lib/platforms/types'
 
-// One worker per platform → each gets its own concurrency + rate limiter so
-// a slow platform can't block the others. We filter inside the handler so all
-// three workers can share the QUEUES.STOCK_SYNC queue name.
+// One queue + worker per platform → each gets its own concurrency + rate
+// limiter, and a worker can never consume another platform's job.
 const PLATFORM_RATE_LIMITS: Record<Platform, { max: number; duration: number }> = {
   trendyol: { max: 10, duration: 1000 },
   shopify: { max: 35, duration: 1000 },
@@ -22,17 +21,14 @@ const PLATFORM_RATE_LIMITS: Record<Platform, { max: number; duration: number }> 
 }
 
 const PLATFORMS: Platform[] = ['trendyol', 'shopify', 'hepsiburada']
+const PENDING_SWEEP_INTERVAL_MS = 60_000
 
 const workers: Worker[] = []
 
 for (const platform of PLATFORMS) {
   const worker = new Worker<SyncJobData>(
-    QUEUES.STOCK_SYNC,
+    syncQueueName(platform),
     async (job) => {
-      // Each worker only processes its own platform — others are no-ops so
-      // they don't grab another platform's job and idle on the wrong limiter.
-      if (job.data.platform !== platform) return { skipped: true, reason: 'wrong_worker' }
-
       const { productId, companyId, listingId } = job.data
 
       const [product, listing, cred] = await Promise.all([
@@ -43,18 +39,23 @@ for (const platform of PLATFORMS) {
         }),
       ])
 
+      const stockToPush =
+        typeof job.data.overrideStock === 'number'
+          ? job.data.overrideStock
+          : availableStock(product.stockCount, product.reservedStock)
+
       // No-op short-circuit: stock already matches what we last pushed.
-      if (listing.stockOnPlatform === product.stockCount) {
+      if (listing.stockOnPlatform === stockToPush) {
         await prisma.platformListing.update({
           where: { id: listingId },
-          data: { syncStatus: 'ok', lastSyncedAt: new Date(), errorMessage: null },
+          data: {
+            syncStatus: job.data.pauseAfterSync ? 'paused' : 'ok',
+            lastSyncedAt: new Date(),
+            errorMessage: null,
+          },
         })
         return { skipped: true, reason: 'stock_unchanged' }
       }
-
-      // Snapshot the value we're about to push so post-push update is correct
-      // even if stockCount changes again before we get back.
-      const stockToPush = product.stockCount
 
       try {
         await pushStockToPlatform(platform, listing.platformProductId, stockToPush, cred.encryptedData)
@@ -73,7 +74,7 @@ for (const platform of PLATFORMS) {
         where: { id: listingId },
         data: {
           stockOnPlatform: stockToPush,
-          syncStatus: 'ok',
+          syncStatus: job.data.pauseAfterSync ? 'paused' : 'ok',
           lastSyncedAt: new Date(),
           errorMessage: null,
         },
@@ -124,6 +125,60 @@ async function pushStockToPlatform(
       return
     }
   }
+}
+
+export function availableStock(stockCount: number, reservedStock: number): number {
+  return Math.max(0, stockCount - reservedStock)
+}
+
+export async function enqueuePendingSyncs(): Promise<{ queued: number; failed: number }> {
+  const listings = await prisma.platformListing.findMany({
+    where: {
+      syncStatus: { in: ['pending', 'error'] },
+      product: { status: { not: 'archived' } },
+    },
+    select: {
+      id: true,
+      platform: true,
+      productId: true,
+      product: { select: { companyId: true } },
+    },
+  })
+
+  let queued = 0
+  let failed = 0
+  for (const listing of listings) {
+    try {
+      await enqueueSync({
+        productId: listing.productId,
+        companyId: listing.product.companyId,
+        listingId: listing.id,
+        platform: listing.platform as Platform,
+      })
+      queued += 1
+    } catch (err) {
+      failed += 1
+      await prisma.platformListing.update({
+        where: { id: listing.id },
+        data: {
+          syncStatus: 'error',
+          errorMessage: err instanceof Error ? err.message : String(err),
+        },
+      })
+    }
+  }
+
+  return { queued, failed }
+}
+
+export function schedulePendingSyncSweep(): NodeJS.Timeout {
+  const timer = setInterval(() => {
+    void enqueuePendingSyncs().catch((err) => {
+      console.error('[sync-worker] pending sync sweep failed:', err)
+    })
+  }, PENDING_SWEEP_INTERVAL_MS)
+  timer.unref()
+  return timer
 }
 
 export { workers as syncWorkers }

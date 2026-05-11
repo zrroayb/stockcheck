@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { requireCompany } from '@/lib/auth'
-import { adjustStock, triggerPlatformSync } from '@/lib/stock-engine'
+import { adjustStock, pausePlatformListings, triggerPlatformSync } from '@/lib/stock-engine'
 import { InsufficientStockError } from '@/lib/errors'
 import { internalApiError } from '@/lib/api-response'
 
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     // Tenant scoping in one query — drop any IDs that aren't ours.
     const ours = await prisma.product.findMany({
       where: { id: { in: body.productIds }, companyId: company.id },
-      select: { id: true, stockCount: true },
+      select: { id: true, stockCount: true, reservedStock: true },
     })
     const ownedIds = new Set(ours.map((p) => p.id))
 
@@ -108,29 +108,45 @@ export async function POST(req: NextRequest) {
       case 'set_reserved': {
         // Reserved doesn't go through the stock engine — it's not actual
         // stock movement, just a soft hold against `available`.
-        try {
-          await prisma.product.updateMany({
-            where: { id: { in: Array.from(ownedIds) } },
-            data: { reservedStock: body.value },
-          })
-          result.ok = ownedIds.size
-        } catch (err) {
-          result.failed = ownedIds.size
-          result.errors.push({ productId: '*', error: explain(err) })
+        for (const p of ours) {
+          if (body.value > p.stockCount) {
+            result.failed += 1
+            result.errors.push({
+              productId: p.id,
+              error: 'reserved stock cannot exceed total stock',
+            })
+            continue
+          }
+
+          try {
+            await prisma.product.update({
+              where: { id: p.id },
+              data: { reservedStock: body.value },
+            })
+            await triggerPlatformSync(p.id, company.id).catch(() => undefined)
+            result.ok += 1
+          } catch (err) {
+            result.failed += 1
+            result.errors.push({ productId: p.id, error: explain(err) })
+          }
         }
         break
       }
 
       case 'pause': {
-        await prisma.platformListing.updateMany({
-          where: { productId: { in: Array.from(ownedIds) } },
-          data: { syncStatus: 'paused' },
-        })
-        await prisma.product.updateMany({
-          where: { id: { in: Array.from(ownedIds) } },
-          data: { status: 'paused' },
-        })
-        result.ok = ownedIds.size
+        for (const p of ours) {
+          try {
+            await pausePlatformListings(p.id, company.id)
+            await prisma.product.update({
+              where: { id: p.id },
+              data: { status: 'paused' },
+            })
+            result.ok += 1
+          } catch (err) {
+            result.failed += 1
+            result.errors.push({ productId: p.id, error: explain(err) })
+          }
+        }
         break
       }
 

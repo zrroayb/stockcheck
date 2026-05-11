@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import { triggerPlatformSync } from '@/lib/stock-engine'
+import { pausePlatformListings } from '@/lib/stock-engine'
 import { sendAlertEmail } from './email'
 
 type RuleWithProduct = Awaited<ReturnType<typeof prisma.alertRule.findFirst>> & {
@@ -66,16 +66,7 @@ async function executeAction(rule: RuleWithProduct, currentStock: number): Promi
     }
 
     case 'pause_listings': {
-      await prisma.platformListing.updateMany({
-        where: { productId: rule.productId },
-        data: { syncStatus: 'paused' },
-      })
-      // Push 0 stock so the marketplaces stop showing the product.
-      await prisma.product.update({
-        where: { id: rule.productId },
-        data: { stockCount: 0 },
-      })
-      await triggerPlatformSync(rule.productId, rule.product.companyId)
+      await pausePlatformListings(rule.productId, rule.product.companyId)
       break
     }
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { CheckCircle2, PlugZap, RadioTower, Trash2, X } from 'lucide-react'
 
 type Field = { name: string; label: string; type: 'text' | 'password'; required?: boolean; placeholder?: string }
 
@@ -48,7 +49,7 @@ export function IntegrationCard(props: {
   }
 
   async function onDisconnect() {
-    if (!confirm(`Disconnect ${props.name}? Stored credentials will be deleted.`)) return
+    if (!confirm(`${props.name} baglantisi silinsin mi? Kayitli kimlik bilgileri silinir.`)) return
     setSubmitting(true)
     try {
       await fetch('/api/platform-credentials', {
@@ -64,28 +65,41 @@ export function IntegrationCard(props: {
 
   return (
     <>
-      <div className="card flex flex-col">
-        <div className={`mb-4 h-12 w-12 rounded-lg bg-gradient-to-br ${props.colorGradient}`} />
-        <div className="mb-1 flex items-center justify-between">
-          <div className="text-lg font-semibold">{props.name}</div>
+      <div className="card flex min-h-64 flex-col">
+        <div className="mb-4 flex items-center justify-between">
+          <div className={`flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br ${props.colorGradient}`}>
+            <RadioTower className="h-5 w-5 text-white" />
+          </div>
           {props.connected ? (
-            <span className="badge-ok">connected</span>
+            <span className="badge-ok gap-1.5">
+              <CheckCircle2 className="h-3 w-3" />
+              bagli
+            </span>
           ) : (
-            <span className="badge-muted">not connected</span>
+            <span className="badge-muted">bagli degil</span>
           )}
         </div>
+        <div className="mb-1 flex items-center justify-between">
+          <div className="text-lg font-semibold">{props.name}</div>
+        </div>
         {props.connected && props.connectedAt ? (
-          <div className="text-xs text-gray-500">Updated {props.connectedAt}</div>
+          <div className="text-xs text-gray-500">Guncellendi {props.connectedAt}</div>
         ) : (
-          <div className="text-xs text-gray-500">Sync stock + receive orders.</div>
+          <div className="text-xs text-gray-500">Stok sync ve siparis akisi.</div>
         )}
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4">
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: props.connected ? '100%' : '34%' }} />
+          </div>
+        </div>
+        <div className="mt-auto flex gap-2 pt-5">
           <button onClick={() => setOpen(true)} className="btn-primary flex-1">
-            {props.connected ? 'Update credentials' : 'Connect'}
+            <PlugZap className="h-4 w-4" />
+            {props.connected ? 'Bilgileri guncelle' : 'Kanali bagla'}
           </button>
           {props.connected ? (
-            <button onClick={onDisconnect} className="btn-danger" disabled={submitting}>
-              Disconnect
+            <button onClick={onDisconnect} className="btn-danger" disabled={submitting} title="Disconnect">
+              <Trash2 className="h-4 w-4" />
             </button>
           ) : null}
         </div>
@@ -97,12 +111,17 @@ export function IntegrationCard(props: {
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-xl border border-border bg-bg-card p-6"
+            className="w-full max-w-md rounded-lg border border-white/10 bg-bg-card p-6 shadow-2xl shadow-black/40"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-1 text-lg font-semibold">Connect {props.name}</h2>
+            <div className="mb-1 flex items-center justify-between gap-4">
+              <h2 className="text-lg font-semibold">{props.name} kanalini bagla</h2>
+              <button type="button" className="btn-icon" onClick={() => setOpen(false)} title="Close">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
             <p className="mb-4 text-xs text-gray-500">
-              Test için <strong>tek bir alana</strong> <code className="rounded bg-bg-subtle px-1">MOCK</code> yaz —
+              Test için <strong>tek bir alana</strong> <code className="rounded bg-bg-subtle px-1">MOCK</code> yaz.
               gerçek API yerine 30 sahte ürünle çalışır.
             </p>
             <form onSubmit={onSave} className="space-y-4">
@@ -113,7 +132,7 @@ export function IntegrationCard(props: {
                     name={f.name}
                     type={f.type}
                     required={f.required}
-                    placeholder={idx === 0 ? `${f.placeholder ?? ''} — ya da MOCK` : f.placeholder}
+                    placeholder={idx === 0 ? `${f.placeholder ?? ''} ya da MOCK` : f.placeholder}
                     className="input"
                   />
                 </div>
@@ -136,10 +155,10 @@ export function IntegrationCard(props: {
                   MOCK ile doldur
                 </button>
                 <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>
-                  Cancel
+                  Iptal
                 </button>
                 <button type="submit" className="btn-primary" disabled={submitting}>
-                  {submitting ? 'Saving…' : 'Save'}
+                  {submitting ? 'Kaydediliyor...' : 'Kaydet'}
                 </button>
               </div>
             </form>

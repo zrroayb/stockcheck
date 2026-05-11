@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { PackagePlus, X } from 'lucide-react'
 
 export function CreateProductButton() {
   const router = useRouter()
@@ -43,7 +44,8 @@ export function CreateProductButton() {
   return (
     <>
       <button onClick={() => setOpen(true)} className="btn-primary">
-        + New product
+        <PackagePlus className="h-4 w-4" />
+        SKU ekle
       </button>
 
       {open ? (
@@ -52,10 +54,16 @@ export function CreateProductButton() {
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-xl border border-border bg-bg-card p-6"
+            className="w-full max-w-md rounded-lg border border-white/10 bg-bg-card p-6 shadow-2xl shadow-black/40"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-4 text-lg font-semibold">New product</h2>
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <h2 className="text-lg font-semibold">Operasyona SKU ekle</h2>
+              <button type="button" className="btn-icon" onClick={() => setOpen(false)} title="Close">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            
             <form onSubmit={onSubmit} className="space-y-4">
               <div>
                 <label className="label">Name</label>
@@ -89,7 +97,7 @@ export function CreateProductButton() {
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary" disabled={submitting}>
-                  {submitting ? 'Creating…' : 'Create product'}
+                  {submitting ? 'Ekleniyor...' : 'SKU olustur'}
                 </button>
               </div>
             </form>

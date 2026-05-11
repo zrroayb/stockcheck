@@ -38,18 +38,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing X-Shopify-Shop-Domain' }, { status: 400 })
   }
 
-  const cred = await prisma.platformCredential.findFirst({
-    where: {
-      platform: 'shopify',
-      // We can't decrypt to filter, so we look up by a separate companyId mapping
-      // strategy: store the storeUrl in a separate (non-encrypted) column when
-      // saving credentials. For now we scan all and match — see TODO.
-    },
-  })
-
-  // Resolve company by scanning all shopify credentials and matching the
-  // storeUrl after decryption. For high-throughput, denormalise storeUrl onto
-  // PlatformCredential as a plain column (not part of the encrypted blob).
   const companyId = await resolveShopifyCompany(shopDomain)
   if (!companyId) {
     console.warn(`[shopify webhook] no company for shop ${shopDomain}`)
@@ -77,17 +65,14 @@ export async function POST(req: NextRequest) {
 }
 
 async function resolveShopifyCompany(shopDomain: string): Promise<string | null> {
-  const { decryptJSON } = await import('@/lib/encrypt')
-  const creds = await prisma.platformCredential.findMany({ where: { platform: 'shopify' } })
-  for (const c of creds) {
-    try {
-      const data = decryptJSON<{ storeUrl: string }>(c.encryptedData)
-      if (data.storeUrl?.toLowerCase() === shopDomain.toLowerCase()) {
-        return c.companyId
-      }
-    } catch {
-      // bad credential — skip
-    }
-  }
-  return null
+  const cred = await prisma.platformCredential.findUnique({
+    where: {
+      platform_externalAccountId: {
+        platform: 'shopify',
+        externalAccountId: shopDomain.trim().toLowerCase(),
+      },
+    },
+    select: { companyId: true },
+  })
+  return cred?.companyId ?? null
 }

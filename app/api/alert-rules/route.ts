@@ -10,7 +10,7 @@ const createSchema = z.object({
   productId: z.string().uuid(),
   ruleType: z.enum(['low_stock', 'out_of_stock', 'overstock']),
   threshold: z.number().int().min(0),
-  action: z.enum(['notify_email', 'pause_listings', 'notify_slack']),
+  action: z.enum(['notify_email', 'pause_listings']),
   enabled: z.boolean().default(true),
 })
 

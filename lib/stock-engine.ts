@@ -13,6 +13,14 @@ type DeductParams = {
 
 type CreditParams = DeductParams
 
+type SetStockParams = {
+  productId: string
+  stockCount: number
+  sourcePlatform: 'trendyol' | 'shopify' | 'hepsiburada' | 'manual' | 'system'
+  eventType?: 'manual_adjust' | 'import' | 'correction'
+  note?: string
+}
+
 type StockRow = {
   id: string
   stock_count: number
@@ -40,7 +48,7 @@ export async function deductStock(params: DeductParams): Promise<number> {
 
   const result = await prisma.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<StockRow[]>`
-      SELECT id, stock_count, reserved_stock, "companyId" AS company_id
+      SELECT id, "stockCount" AS stock_count, "reservedStock" AS reserved_stock, "companyId" AS company_id
       FROM "Product"
       WHERE id = ${productId}
       FOR UPDATE
@@ -77,7 +85,7 @@ export async function deductStock(params: DeductParams): Promise<number> {
     isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
   })
 
-  await enqueueAlertCheck({ productId, newStockCount: result.newCount })
+  await queueAlertCheckSafely(productId, result.newCount)
   return result.newCount
 }
 
@@ -114,7 +122,7 @@ export async function creditStock(params: CreditParams): Promise<number> {
     return product
   })
 
-  await enqueueAlertCheck({ productId, newStockCount: updated.stockCount })
+  await queueAlertCheckSafely(productId, updated.stockCount)
   return updated.stockCount
 }
 
@@ -150,6 +158,78 @@ export async function adjustStock(params: {
 }
 
 /**
+ * Set an absolute stock count through the stock engine.
+ *
+ * Use this for convergence flows like marketplace import where the user picks
+ * the new master value. It still writes a delta StockEvent so the audit ledger
+ * remains reconcilable with Product.stockCount.
+ */
+export async function setStockCount(params: SetStockParams): Promise<number> {
+  const { productId, stockCount, sourcePlatform, eventType = 'correction', note } = params
+
+  if (stockCount < 0) {
+    throw new Error(`setStockCount requires stockCount >= 0 (got ${stockCount})`)
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<StockRow[]>`
+      SELECT id, "stockCount" AS stock_count, "reservedStock" AS reserved_stock, "companyId" AS company_id
+      FROM "Product"
+      WHERE id = ${productId}
+      FOR UPDATE
+    `
+
+    const row = rows[0]
+    if (!row) throw new Error(`Product not found: ${productId}`)
+    if (stockCount < row.reserved_stock) {
+      throw new InsufficientStockError(
+        productId,
+        row.stock_count - row.reserved_stock,
+        row.stock_count - stockCount
+      )
+    }
+
+    const delta = stockCount - row.stock_count
+    if (delta === 0) {
+      return { newCount: row.stock_count }
+    }
+
+    await tx.product.update({
+      where: { id: productId },
+      data: { stockCount },
+    })
+
+    await tx.stockEvent.create({
+      data: {
+        productId,
+        sourcePlatform,
+        eventType,
+        quantityDelta: delta,
+        note,
+      },
+    })
+
+    return { newCount: stockCount }
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+  })
+
+  await queueAlertCheckSafely(productId, updated.newCount)
+  return updated.newCount
+}
+
+async function queueAlertCheckSafely(productId: string, newStockCount: number): Promise<void> {
+  try {
+    await enqueueAlertCheck({ productId, newStockCount })
+  } catch (err) {
+    console.warn(
+      `[stock-engine] failed to enqueue alert check for product ${productId}:`,
+      err
+    )
+  }
+}
+
+/**
  * After a stock change, fan out a sync job to every active platform listing.
  *
  * The sync worker's first check is "did the stock actually change since the
@@ -165,14 +245,63 @@ export async function triggerPlatformSync(productId: string, companyId: string):
   })
 
   await Promise.all(
-    listings.map((listing) =>
-      enqueueSync({
-        productId,
-        companyId,
-        listingId: listing.id,
-        platform: listing.platform as Platform,
+    listings.map(async (listing) => {
+      await prisma.platformListing.update({
+        where: { id: listing.id },
+        data: { syncStatus: 'pending', errorMessage: null },
       })
-    )
+
+      try {
+        await enqueueSync({
+          productId,
+          companyId,
+          listingId: listing.id,
+          platform: listing.platform as Platform,
+        })
+      } catch (err) {
+        await prisma.platformListing.update({
+          where: { id: listing.id },
+          data: {
+            syncStatus: 'error',
+            errorMessage: err instanceof Error ? err.message : String(err),
+          },
+        })
+      }
+    })
+  )
+}
+
+export async function pausePlatformListings(productId: string, companyId: string): Promise<void> {
+  const listings = await prisma.platformListing.findMany({
+    where: { productId, syncStatus: { not: 'disabled' } },
+  })
+
+  await Promise.all(
+    listings.map(async (listing) => {
+      await prisma.platformListing.update({
+        where: { id: listing.id },
+        data: { syncStatus: 'pending', errorMessage: null },
+      })
+
+      try {
+        await enqueueSync({
+          productId,
+          companyId,
+          listingId: listing.id,
+          platform: listing.platform as Platform,
+          overrideStock: 0,
+          pauseAfterSync: true,
+        })
+      } catch (err) {
+        await prisma.platformListing.update({
+          where: { id: listing.id },
+          data: {
+            syncStatus: 'error',
+            errorMessage: err instanceof Error ? err.message : String(err),
+          },
+        })
+      }
+    })
   )
 }
 
@@ -184,6 +313,7 @@ export async function markOrderCancelledForInsufficientStock(params: {
   orderId: string
   productId: string
   sourcePlatform: string
+  note?: string
 }): Promise<void> {
   await prisma.$transaction([
     prisma.order.update({
@@ -197,7 +327,7 @@ export async function markOrderCancelledForInsufficientStock(params: {
         sourcePlatform: params.sourcePlatform,
         eventType: 'cancelled',
         quantityDelta: 0,
-        note: 'Cancelled — insufficient stock at time of deduction',
+        note: params.note ?? 'Cancelled — insufficient stock at time of deduction',
       },
     }),
   ])

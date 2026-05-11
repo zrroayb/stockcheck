@@ -3,7 +3,6 @@ import { z } from 'zod'
 import { verifyHepsiburadaWebhook } from '@/lib/platforms/hepsiburada'
 import { processIncomingOrder } from '@/lib/webhooks/process-order'
 import { prisma } from '@/lib/db'
-import { decryptJSON } from '@/lib/encrypt'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -67,14 +66,14 @@ export async function POST(req: NextRequest) {
 
 async function resolveHepsiburadaCompany(merchantId: string | null): Promise<string | null> {
   if (!merchantId) return null
-  const creds = await prisma.platformCredential.findMany({ where: { platform: 'hepsiburada' } })
-  for (const c of creds) {
-    try {
-      const data = decryptJSON<{ merchantId: string }>(c.encryptedData)
-      if (data.merchantId === merchantId) return c.companyId
-    } catch {
-      // skip
-    }
-  }
-  return null
+  const cred = await prisma.platformCredential.findUnique({
+    where: {
+      platform_externalAccountId: {
+        platform: 'hepsiburada',
+        externalAccountId: merchantId.trim().toLowerCase(),
+      },
+    },
+    select: { companyId: true },
+  })
+  return cred?.companyId ?? null
 }

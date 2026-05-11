@@ -69,30 +69,29 @@ function Guide() {
     <div className="space-y-6">
       <Section title="Hoş geldin">
         <p>
-          <strong>Stokkontrol</strong>, ürünlerinin stoğunu birden fazla pazaryerinde
-          (Trendyol, Shopify, Hepsiburada) tek bir yerden yönetmeni sağlar. Senin bu
-          uygulamadaki <em>stockCount</em> sayın <strong>tek doğruluk kaynağı</strong>dır —
-          bir pazaryerinde sattığında, diğerlerine otomatik olarak yeni stok yazılır.
+          <strong>PazarPilot</strong>, e-ticaret operasyonunu tek kokpitte toplar:
+          stok, sipariş, pazaryeri listingleri, alarm ve otomasyon aynı yerden yönetilir.
+          Uygulamadaki <em>stockCount</em> sayın <strong>tek doğruluk kaynağı</strong>dır.
+          Bir pazaryerinde sattığında, diğer kanallara otomatik olarak yeni stok yazılır.
         </p>
       </Section>
 
       <Section title="Hızlı başlangıç">
         <ol className="list-decimal space-y-1.5 pl-5">
           <li>
-            <Kbd>Integrations</Kbd> sayfasından pazaryerlerini bağla (Trendyol, Shopify,
+            <Kbd>Kanallar</Kbd> sayfasından pazaryerlerini bağla (Trendyol, Shopify,
             Hepsiburada).
           </li>
           <li>
-            <Kbd>Products → İçe aktar</Kbd> → "Pazaryerlerini tara" → aynı SKU'lar
-            otomatik birleştirilir, çakışmalar review tablosunda karşına çıkar →{' '}
-            <strong>Apply</strong> de geç.
+            <Kbd>Operasyon → Kanaldan içe aktar</Kbd> ile aynı SKU'ları otomatik
+            birleştir, çakışmaları review tablosunda seç ve <strong>Apply</strong> de.
           </li>
           <li>
             Listede <Kbd>checkbox</Kbd>'larla birden fazla ürün seç → üstte beliren
             toolbar'dan toplu stok güncelle / duraklat / aktifleştir.
           </li>
           <li>
-            <Kbd>Alerts</Kbd> sayfasından "stok 5'in altına düşerse mail at" gibi
+            <Kbd>Otomasyon</Kbd> sayfasından "stok 5'in altına düşerse mail at" gibi
             kural tanımla.
           </li>
         </ol>
@@ -100,7 +99,7 @@ function Guide() {
 
       <Section title="Pazaryerinden ürün içe aktarma">
         <p>
-          <Kbd>Products → İçe aktar</Kbd> butonuyla bağlı tüm pazaryerlerinden ürünler
+          <Kbd>Operasyon → Kanaldan içe aktar</Kbd> butonuyla bağlı tüm pazaryerlerinden ürünler
           çekilir ve <strong>SKU bazında</strong> otomatik gruplanır. Üç sekme görürsün:
         </p>
         <Defs>
@@ -132,7 +131,7 @@ function Guide() {
         </Defs>
       </Section>
 
-      <Section title="Sayfalar — Products">
+      <Section title="Sayfalar - Operasyon">
         <p>Tüm ürünlerinin listesi. Sütunlar:</p>
         <Defs>
           <Def term="Stock">Toplam stok (depodaki tüm ürün).</Def>
@@ -154,7 +153,7 @@ function Guide() {
         </p>
       </Section>
 
-      <Section title="Sayfalar — Orders">
+      <Section title="Sayfalar - Siparişler">
         <p>Tüm pazaryerlerinden akan siparişlerin tek listesi. Filtre: platform + durum.</p>
         <Defs>
           <Def term="received">Webhook ile geldi, stok düşüldü.</Def>
@@ -166,7 +165,7 @@ function Guide() {
         </Defs>
       </Section>
 
-      <Section title="Sayfalar — Alerts">
+      <Section title="Sayfalar - Otomasyon">
         <p>Stok eşiği geçince ne olacağını tanımladığın kurallar.</p>
         <Defs>
           <Def term="low_stock">Stok ≤ eşik altına düşünce.</Def>
@@ -179,11 +178,10 @@ function Guide() {
           <Def term="pause_listings">
             Tüm pazaryerlerinde ürünü 0 stoka çekip görünmez yapar.
           </Def>
-          <Def term="notify_slack">(yakında)</Def>
         </Defs>
       </Section>
 
-      <Section title="Sayfalar — Integrations">
+      <Section title="Sayfalar - Kanallar">
         <p>
           Pazaryeri kimlik bilgileri burada eklenir. <strong>Tümü AES-256-GCM ile
           şifrelenir</strong> ve geri okunmaz — sadece güncelleyebilir veya silebilirsin.
@@ -198,7 +196,7 @@ function Guide() {
         </Defs>
       </Section>
 
-      <Section title="Sayfalar — Team">
+      <Section title="Sayfalar - Ekip">
         <p>
           Workspace üyelerini yönet. Davet gönderme, rol değiştirme, çıkartma — Clerk'in
           organization profile'ı üzerinden.

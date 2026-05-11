@@ -132,7 +132,7 @@ export function ImportClient({ connectedPlatforms }: { connectedPlatforms: strin
           </p>
           <div className="mt-5">
             <Link href="/settings/integrations" className="btn-primary">
-              Integrations sayfasına git
+              Kanal merkezine git
             </Link>
           </div>
         </div>
@@ -157,11 +157,11 @@ export function ImportClient({ connectedPlatforms }: { connectedPlatforms: strin
           <p className="mx-auto mt-3 max-w-lg text-sm text-gray-400">
             Tara butonu, bağlı tüm pazaryerlerinden ürünlerinin <strong>SKU</strong>'larını
             çeker, aynı SKU'ları gruplar ve karşına bir review ekranı çıkarır. Daha hiçbir
-            şey yazılmaz — sen "Apply" deyince DB'ye geçer.
+            sey yazilmaz. Sen "Apply" deyince DB'ye gecer.
           </p>
           <div className="mt-5">
             <button onClick={runScan} className="btn-primary" disabled={scanning}>
-              {scanning ? 'Taranıyor… (büyük katalogda 1-2 dk sürebilir)' : 'Pazaryerlerini tara'}
+              {scanning ? 'Taraniyor... (buyuk katalogda 1-2 dk surebilir)' : 'Pazaryerlerini tara'}
             </button>
           </div>
           {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
@@ -193,7 +193,7 @@ export function ImportClient({ connectedPlatforms }: { connectedPlatforms: strin
               ) : null}
               <div className="mt-3">
                 <Link href="/products" className="btn-primary text-xs">
-                  Ürünler sayfasına git →
+                  Operasyon merkezine git
                 </Link>
               </div>
             </div>
@@ -241,7 +241,7 @@ export function ImportClient({ connectedPlatforms }: { connectedPlatforms: strin
                   type="checkbox"
                   checked={pushBack}
                   onChange={(e) => setPushBack(e.target.checked)}
-                  className="h-4 w-4 accent-indigo-500"
+                  className="h-4 w-4 accent-amber-400"
                 />
                 Master stoğu pazaryerlerine de hemen yaz (push-back)
               </label>
@@ -251,7 +251,7 @@ export function ImportClient({ connectedPlatforms }: { connectedPlatforms: strin
                 Yeniden tara
               </button>
               <button onClick={runApply} className="btn-primary" disabled={applying || includedCount === 0}>
-                {applying ? 'Uygulanıyor…' : `${includedCount} ürünü içe aktar`}
+                {applying ? 'Uygulaniyor...' : `${includedCount} urunu ice aktar`}
               </button>
             </div>
           </div>
@@ -267,9 +267,9 @@ function Header() {
   return (
     <div>
       <Link href="/products" className="text-sm text-gray-400 hover:text-gray-100">
-        ← Ürünler
+        Operasyon merkezine don
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold">Pazaryerinden ürün içe aktar</h1>
+      <h1 className="mt-2 text-2xl font-semibold">Kanallardan katalog ice aktar</h1>
       <p className="text-sm text-gray-400">
         Aynı SKU'lar tek bir master ürün altında birleştirilir; o andan sonra stok tek
         yerden yönetilir.
@@ -322,7 +322,7 @@ function TabButton({
       className={cn(
         '-mb-px rounded-t-md border-b-2 px-4 py-2 text-sm transition-colors',
         active
-          ? 'border-indigo-500 text-white'
+          ? 'border-amber-400 text-white'
           : 'border-transparent text-gray-400 hover:text-gray-200'
       )}
     >
@@ -369,7 +369,7 @@ function RowTable({
                     type="checkbox"
                     checked={pick.include}
                     onChange={(e) => setPick(r.sku, { include: e.target.checked })}
-                    className="h-4 w-4 accent-indigo-500"
+                    className="h-4 w-4 accent-amber-400"
                   />
                 </td>
                 <td>
@@ -378,7 +378,7 @@ function RowTable({
                     <code>{r.rawSku}</code>
                     {r.barcode ? <> · {r.barcode}</> : null}
                     {r.existingProductId ? (
-                      <span className="ml-2 badge-warn">DB'de mevcut — güncellenecek</span>
+                      <span className="ml-2 badge-warn">DB'de mevcut - guncellenecek</span>
                     ) : null}
                   </div>
                 </td>
@@ -391,11 +391,11 @@ function RowTable({
                           key={s.platform}
                           type="button"
                           onClick={() => setPick(r.sku, { stock: s.stock })}
-                          title={`${s.platform}: ${s.stock} → master yap`}
+                          title={`${s.platform}: ${s.stock} master yap`}
                           className={cn(
                             'rounded-md border px-2 py-1 text-xs transition-colors',
                             equalsPick
-                              ? 'border-indigo-500 bg-indigo-500/15 text-indigo-100'
+                              ? 'border-amber-400 bg-amber-400/15 text-amber-100'
                               : 'border-border bg-bg-subtle text-gray-300 hover:bg-bg-card'
                           )}
                         >

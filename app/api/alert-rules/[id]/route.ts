@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 
 const patchSchema = z.object({
   threshold: z.number().int().min(0).optional(),
-  action: z.enum(['notify_email', 'pause_listings', 'notify_slack']).optional(),
+  action: z.enum(['notify_email', 'pause_listings']).optional(),
   enabled: z.boolean().optional(),
 })
 

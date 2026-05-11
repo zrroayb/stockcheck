@@ -4,29 +4,41 @@ import { dark } from '@clerk/themes'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Stokkontrol — Multi-Marketplace Stock Control',
-  description: 'Keep your product stock in sync across Trendyol, Shopify and Hepsiburada.',
+  title: 'PazarPilot | E-ticaret operasyon super app',
+  description: 'Trendyol, Shopify ve Hepsiburada stok, siparis ve kanal operasyonunu tek merkezden yonet.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const themeScript = `
+    try {
+      var stored = window.localStorage.getItem('theme');
+      document.documentElement.dataset.theme = stored === 'light' ? 'light' : 'dark';
+    } catch (_) {
+      document.documentElement.dataset.theme = 'dark';
+    }
+  `
+
   return (
     <ClerkProvider
       appearance={{
         baseTheme: dark,
         variables: {
-          colorPrimary: '#6366f1',
-          colorBackground: '#0b0d12',
-          colorInputBackground: '#10131a',
-          colorInputText: '#e8eaf0',
-          colorText: '#e8eaf0',
-          colorTextSecondary: '#9aa3b2',
-          colorTextOnPrimaryBackground: '#eef2ff',
-          colorNeutral: '#e8eaf0',
+          colorPrimary: '#14b8a6',
+          colorBackground: '#0b0b08',
+          colorInputBackground: '#151511',
+          colorInputText: '#f4f2ea',
+          colorText: '#f4f2ea',
+          colorTextSecondary: '#a8a29a',
+          colorTextOnPrimaryBackground: '#06201d',
+          colorNeutral: '#f4f2ea',
         },
       }}
     >
-      <html lang="en">
-        <body>{children}</body>
+      <html lang="tr" suppressHydrationWarning>
+        <body>
+          <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+          {children}
+        </body>
       </html>
     </ClerkProvider>
   )

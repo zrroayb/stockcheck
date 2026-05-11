@@ -23,21 +23,21 @@ export default async function ProductPage({ params }: { params: { id: string } }
   })
   if (!product) notFound()
 
-  const available = product.stockCount - product.reservedStock
+  const available = Math.max(0, product.stockCount - product.reservedStock)
 
   return (
     <div className="space-y-6">
       <div>
         <Link href="/products" className="text-sm text-gray-400 hover:text-gray-100">
-          ← All products
+          Tum SKU'lar
         </Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">{product.name}</h1>
             <div className="mt-1 flex items-center gap-2 text-sm text-gray-400">
               <code className="rounded bg-bg-subtle px-1.5 py-0.5 text-xs">{product.masterSku}</code>
-              {product.barcode ? <span>· {product.barcode}</span> : null}
-              <span>· status: {product.status}</span>
+              {product.barcode ? <span>{product.barcode}</span> : null}
+              <span>status: {product.status}</span>
             </div>
           </div>
           <span
@@ -46,32 +46,32 @@ export default async function ProductPage({ params }: { params: { id: string } }
             }`}
           >
             {formatNumber(available)}
-            <span className="ml-2 text-sm font-normal text-gray-500">available</span>
+            <span className="ml-2 text-sm font-normal text-gray-500">satilabilir</span>
           </span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Stat label="Stock count" value={product.stockCount} />
-        <Stat label="Reserved" value={product.reservedStock} />
-        <Stat label="Available" value={available} />
+        <Stat label="Ana stok" value={product.stockCount} />
+        <Stat label="Rezerve" value={product.reservedStock} />
+        <Stat label="Satisa hazir" value={available} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
-            Adjust stock
+            Stok ayari
           </h2>
           <StockAdjustForm productId={product.id} currentStock={product.stockCount} />
         </section>
 
         <section className="space-y-4">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
-            Platform listings
+            Kanal listingleri
           </h2>
           {product.platformListings.length === 0 ? (
             <div className="card text-sm text-gray-400">
-              No platform listings yet. Connect an integration in settings.
+              Henuz kanal listingi yok. Kanal merkezinden pazaryeri baglayip urunleri ice aktar.
             </div>
           ) : (
             <div className="space-y-2">
@@ -80,8 +80,8 @@ export default async function ProductPage({ params }: { params: { id: string } }
                   <div>
                     <div className="font-medium capitalize">{l.platform}</div>
                     <div className="text-xs text-gray-500">
-                      Last pushed: {formatNumber(l.stockOnPlatform)}
-                      {l.lastSyncedAt ? ` · ${relativeTime(l.lastSyncedAt)}` : ''}
+                      Son push: {formatNumber(l.stockOnPlatform)}
+                      {l.lastSyncedAt ? ` - ${relativeTime(l.lastSyncedAt)}` : ''}
                     </div>
                   </div>
                   <span
@@ -104,18 +104,18 @@ export default async function ProductPage({ params }: { params: { id: string } }
 
       <section className="space-y-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
-          Stock event log
+          Stok defteri
         </h2>
         {product.stockEvents.length === 0 ? (
-          <div className="card text-sm text-gray-400">No events recorded.</div>
+          <div className="card text-sm text-gray-400">Henuz stok olayi yok.</div>
         ) : (
           <div className="table-wrap">
             <table className="table-base">
               <thead>
                 <tr>
-                  <th>When</th>
-                  <th>Source</th>
-                  <th>Type</th>
+                  <th>Zaman</th>
+                  <th>Kaynak</th>
+                  <th>Tip</th>
                   <th className="text-right">Δ</th>
                   <th>Note</th>
                 </tr>
